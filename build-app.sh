@@ -16,6 +16,17 @@ chmod +x "$APP/Contents/Resources/camilladsp"
 cp "Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 rm -f "Resources/camilladsp.tar.gz"
 
+# 双语 App 名（菜单栏 / Finder / 关于本机里跟随系统语言）
+mkdir -p "$APP/Contents/Resources/zh-Hans.lproj" "$APP/Contents/Resources/en.lproj"
+cat > "$APP/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" <<'S'
+CFBundleDisplayName = "MultiSpeaker 多喇叭合奏";
+CFBundleName = "MultiSpeaker";
+S
+cat > "$APP/Contents/Resources/en.lproj/InfoPlist.strings" <<'S'
+CFBundleDisplayName = "MultiSpeaker";
+CFBundleName = "MultiSpeaker";
+S
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -35,14 +46,19 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 	<string>AppIcon</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>MultiSpeaker</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>1.1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>

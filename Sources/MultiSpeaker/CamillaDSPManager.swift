@@ -9,9 +9,9 @@ enum CamillaError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .binaryMissing:
-            return "找不到 camilladsp 可执行文件（已内置在 App 内，若从源码运行请放到 ~/camilladsp/）"
+            return L.t("找不到 camilladsp 可执行文件（已内置在 App 内，若从源码运行请放到 ~/camilladsp/）")
         case .configInvalid(let reason):
-            return "配置校验失败：\(reason)"
+            return L.t("配置校验失败：%@", reason)
         }
     }
 }
@@ -28,6 +28,10 @@ final class CamillaDSPManager {
     var pendingRestart = false
     /// 用户「期望」它处于运行状态（与进程实际状态解耦，供看门狗判断是否需要复活）
     var wantsToRun = false
+
+    /// 实时音量通道（websocket）：音量/静音不写配置、不重启进程
+    let remote = CamillaRemote()
+    private var wsPort: UInt16 = 0
 
     private var process: Process?
     private var restartTask: Task<Void, Never>?
@@ -96,8 +100,6 @@ final class CamillaDSPManager {
         let delay = String(format: "%.1f", settings.delayMs)
         let gb = String(format: "%.1f", settings.gainBuiltinDb)
         let gm = String(format: "%.1f", settings.gainMonitorDb)
-        let mv = String(format: "%.1f", settings.masterVolumeDb)
-        let muted = settings.muted ? "true" : "false"
 
         return """
         # 由 MultiSpeaker 自动生成 · 改动请在 App 的「调音台」里进行
@@ -119,13 +121,6 @@ final class CamillaDSPManager {
             device: "MultiSpeaker"
 
         filters:
-          master_gain:
-            type: Gain
-            parameters:
-              gain: \(mv)
-              inverted: false
-              mute: \(muted)
-
           hp_\(fInt)_a:
             type: Biquad
             parameters:
@@ -208,10 +203,10 @@ final class CamillaDSPManager {
             name: split_stereo_to_4ch
           - type: Filter
             channels: [0, 1]
-            names: [master_gain, hp_\(fInt)_a, hp_\(fInt)_b, delay_builtin, gain_builtin]
+            names: [hp_\(fInt)_a, hp_\(fInt)_b, delay_builtin, gain_builtin]
           - type: Filter
             channels: [2, 3]
-            names: [master_gain, lp_\(fInt)_a, lp_\(fInt)_b, gain_monitor]
+            names: [lp_\(fInt)_a, lp_\(fInt)_b, gain_monitor]
         """
     }
 
@@ -233,13 +228,20 @@ final class CamillaDSPManager {
         // 先干跑校验，提前给出可读错误
         let check = await Shell.run(binary, ["--check", config.path]) { _ in }
         if check != 0 {
-            throw CamillaError.configInvalid("camilladsp --check 退出码 \(check)")
+            throw CamillaError.configInvalid(L.t("camilladsp --check 退出码 %d", check))
         }
 
         let p = Process()
         let pipe = Pipe()
         p.executableURL = URL(fileURLWithPath: binary)
-        p.arguments = [config.path, "-l", "info"]
+        // -p：websocket 端口（音量/静音实时调，不重启）；-g / -m：启动即带上当前音量状态
+        let port = Self.freePort()
+        wsPort = port
+        // 注意 -g 必须用等号写法：`-g -5.0` 会被 clap 当成新的短选项而报错
+        var args = [config.path, "-l", "info", "-p", "\(port)",
+                    "-g=\(String(format: "%.1f", settings.masterVolumeDb))"]
+        if settings.muted { args.append("-m") }
+        p.arguments = args
         p.standardOutput = pipe
         p.standardError = pipe
         p.currentDirectoryURL = appSupportDir
@@ -271,7 +273,44 @@ final class CamillaDSPManager {
         Self.childPID = p.processIdentifier
         isRunning = true
         wantsToRun = true
-        appendLog("── CamillaDSP 已启动（\(config.lastPathComponent)）")
+        remote.attach(port: port, volume: settings.masterVolumeDb, muted: settings.muted)
+        appendLog("── CamillaDSP 已启动（\(config.lastPathComponent)，控制端口 \(port)）")
+    }
+
+    // MARK: - 实时音量（不重启）
+
+    func setVolume(_ db: Double) {
+        remote.setVolume(db)
+    }
+
+    func setMute(_ muted: Bool) {
+        remote.setMute(muted)
+    }
+
+    /// 交给 camilladsp 的 websocket 端口：先绑 0 号端口拿到内核分配的空闲端口
+    private static func freePort() -> UInt16 {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return 12345 }
+        defer { close(fd) }
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = 0
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let bound = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        guard bound == 0 else { return 12345 }
+        var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let named = withUnsafeMutablePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getsockname(fd, $0, &len)
+            }
+        }
+        guard named == 0, addr.sin_port != 0 else { return 12345 }
+        return UInt16(bigEndian: addr.sin_port)
     }
 
     /// 停止并阻塞等待进程真正退出（重建聚合设备前必须先调用，
@@ -297,6 +336,7 @@ final class CamillaDSPManager {
         wantsToRun = false
         guard let p = process, isRunning else { return }
         stoppingByUser = true
+        remote.detach()
         p.interrupt() // SIGINT，CamillaDSP 会干净退出
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -329,13 +369,14 @@ final class CamillaDSPManager {
         isRunning = false
         process = nil
         Self.childPID = nil
+        remote.detach()
         if stoppingByUser {
-            appendLog("── CamillaDSP 已停止（用户操作）")
+            appendLog("── " + L.t("CamillaDSP 已停止（用户操作）"))
         } else if code != 0 {
-            lastErrorMessage = "CamillaDSP 异常退出（code \(code)），请检查日志；常见原因是聚合设备 MultiSpeaker 不在线（显示器休眠）或 BlackHole 未设为默认输出。"
+            lastErrorMessage = L.t("CamillaDSP 异常退出（code %d），请检查日志；常见原因是聚合设备 MultiSpeaker 不在线（显示器休眠）或 BlackHole 未设为默认输出。", code)
             appendLog("✗ CamillaDSP 异常退出，code \(code)")
         } else {
-            appendLog("── CamillaDSP 已退出")
+            appendLog("── " + L.t("CamillaDSP 已退出"))
         }
     }
 

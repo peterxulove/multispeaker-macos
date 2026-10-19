@@ -22,7 +22,7 @@ final class BlackHoleManager {
         guard !isInstalling else { return }
         isInstalling = true
         installLog.removeAll()
-        lastMessage = "正在安装 BlackHole 2ch…"
+        lastMessage = L.t("正在安装 BlackHole 2ch…")
         installTask = Task { [weak self] in
             guard let self else { return }
             defer { self.isInstalling = false }
@@ -36,7 +36,7 @@ final class BlackHoleManager {
     }
 
     private func installWithBrew() async {
-        lastMessage = "正在通过 Homebrew 安装（可能需要输入管理员密码）…"
+        lastMessage = L.t("正在通过 Homebrew 安装（可能需要输入管理员密码）…")
         var brew = "/opt/homebrew/bin/brew"
         if !FileManager.default.isExecutableFile(atPath: brew) { brew = "/usr/local/bin/brew" }
         var env = ProcessInfo.processInfo.environment
@@ -49,14 +49,14 @@ final class BlackHoleManager {
             }
         }
         if code == 0 {
-            lastMessage = "安装完成。请到「系统设置 → 隐私与安全性」允许系统扩展，然后重启 Mac。"
+            lastMessage = L.t("安装完成。请到「系统设置 → 隐私与安全性」允许系统扩展，然后重启 Mac。")
         } else {
-            lastMessage = "Homebrew 安装失败（退出码 \(code)），请改用「下载安装包」方式。"
+            lastMessage = L.t("Homebrew 安装失败（退出码 %d），请改用「下载安装包」方式。", code)
         }
     }
 
     func installWithPackage() async {
-        lastMessage = "正在从 GitHub 获取最新安装包…"
+        lastMessage = L.t("正在从 GitHub 获取最新安装包…")
         guard let url = URL(string: "https://api.github.com/repos/ExistentialAudio/BlackHole/releases/latest") else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -67,7 +67,7 @@ final class BlackHoleManager {
                   let name = asset["name"] as? String,
                   let downloadURLString = asset["browser_download_url"] as? String,
                   let downloadURL = URL(string: downloadURLString) else {
-                lastMessage = "没有找到 BlackHole 2ch 安装包。"
+                lastMessage = L.t("没有找到 BlackHole 2ch 安装包。")
                 return
             }
             let dest = FileManager.default.homeDirectoryForCurrentUser
@@ -75,10 +75,10 @@ final class BlackHoleManager {
             let (tmpLocal, _) = try await URLSession.shared.download(from: downloadURL)
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.copyItem(at: tmpLocal, to: dest)
-            lastMessage = "已下载到「下载」文件夹，正在打开安装器…"
+            lastMessage = L.t("已下载到「下载」文件夹，正在打开安装器…")
             NSWorkspace.shared.open(dest)
         } catch {
-            lastMessage = "下载失败：\(error.localizedDescription)"
+            lastMessage = L.t("下载失败：%@", error.localizedDescription)
         }
     }
 }

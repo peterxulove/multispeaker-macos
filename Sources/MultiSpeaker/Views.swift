@@ -2,20 +2,23 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppCoordinator.self) private var coordinator
+    /// 记住上次停留的页签（切语言重建后也不会跳回第一页）
+    @AppStorage("ui.selectedTab") private var selectedTab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             SetupView()
-                .tabItem { Label("一键设置", systemImage: "gear") }
+                .tabItem { Label(L.t("一键设置"), systemImage: "gear") }
                 .tag(0)
             TuningView()
-                .tabItem { Label("调音台", systemImage: "slider.vertical.3") }
+                .tabItem { Label(L.t("调音台"), systemImage: "slider.vertical.3") }
                 .tag(1)
             ControlView()
-                .tabItem { Label("运行与日志", systemImage: "waveform.and.mic") }
+                .tabItem { Label(L.t("运行与日志"), systemImage: "waveform.and.mic") }
                 .tag(2)
         }
         .frame(minWidth: 760, minHeight: 560)
+        .id(coordinator.settings.language)
         .background(
             WindowAccessor { window in
                 MainWindowController.shared.attach(window)
@@ -40,10 +43,10 @@ private enum StepState {
 
     var title: String {
         switch self {
-        case .ok: return "就绪"
-        case .pending: return "未完成"
-        case .warn: return "注意"
-        case .busy: return "进行中"
+        case .ok: return L.t("就绪")
+        case .pending: return L.t("未完成")
+        case .warn: return L.t("注意")
+        case .busy: return L.t("进行中")
         }
     }
 }
@@ -117,34 +120,34 @@ struct SetupView: View {
                 GroupBox {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
-                            pill("系统音频", color: .primary)
+                            pill(L.t("系统音频"), color: .primary)
                             chainArrow()
                             pill("BlackHole 2ch", color: .purple)
                             chainArrow()
-                            pill("CamillaDSP 分频", color: .blue)
+                            pill(L.t("CamillaDSP 分频"), color: .blue)
                             chainArrow()
                             pill("MultiSpeaker 4ch", color: .teal)
                             chainArrow()
                             VStack(alignment: .leading, spacing: 3) {
-                                pill("ch1/2 高频 >\(Int(settings.crossoverHz))Hz → 笔记本喇叭", color: .orange)
-                                pill("ch3/4 低频 <\(Int(settings.crossoverHz))Hz → 外接音箱", color: .indigo)
+                                pill(L.t("ch1/2 高频 >%dHz → 笔记本喇叭", Int(settings.crossoverHz)), color: .orange)
+                                pill(L.t("ch3/4 低频 <%dHz → 外接音箱", Int(settings.crossoverHz)), color: .indigo)
                             }
                         }
                         .padding(.vertical, 4)
                     }
                 } label: {
-                    Text("信号链路").font(.headline)
+                    Text(L.t("信号链路")).font(.headline)
                 }
 
                 // 第 1 步：BlackHole
-                StepCard(index: "1", title: "安装 BlackHole 2ch 虚拟声卡", state: coordinator.blackhole.isInstalled ? .ok : (coordinator.blackhole.isInstalling ? .busy : .pending)) {
+                StepCard(index: "1", title: L.t("安装 BlackHole 2ch 虚拟声卡"), state: coordinator.blackhole.isInstalled ? .ok : (coordinator.blackhole.isInstalling ? .busy : .pending)) {
                     VStack(alignment: .leading, spacing: 8) {
                         if coordinator.blackhole.isInstalled {
-                            Text("已检测到 BlackHole 2ch，格式已固定为 48000Hz。")
+                            Text(L.t("已检测到 BlackHole 2ch，格式已固定为 48000Hz。"))
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         } else {
-                            Text("BlackHole 用来把系统输出抓进来给 CamillaDSP 处理。安装后需要到「系统设置 → 隐私与安全性」允许系统扩展并重启 Mac。")
+                            Text(L.t("BlackHole 用来把系统输出抓进来给 CamillaDSP 处理。安装后需要到「系统设置 → 隐私与安全性」允许系统扩展并重启 Mac。"))
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
@@ -153,13 +156,13 @@ struct SetupView: View {
                                 Button {
                                     coordinator.blackhole.install()
                                 } label: {
-                                    Label("安装（Homebrew）", systemImage: "arrow.down.circle")
+                                    Label(L.t("安装（Homebrew）"), systemImage: "arrow.down.circle")
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(coordinator.blackhole.isInstalling)
                             }
-                            Button("重新检测") { coordinator.refreshDevices() }
-                            Button("下载安装包") { Task { await coordinator.blackhole.installWithPackage() } }
+                            Button(L.t("重新检测")) { coordinator.refreshDevices() }
+                            Button(L.t("下载安装包")) { Task { await coordinator.blackhole.installWithPackage() } }
                         }
                         if !coordinator.blackhole.lastMessage.isEmpty {
                             Text(coordinator.blackhole.lastMessage)
@@ -171,33 +174,33 @@ struct SetupView: View {
                 }
 
                 // 第 2 步：设备与聚合
-                StepCard(index: "2", title: "选择两路喇叭并创建聚合设备", state: coordinator.aggregateDevice != nil ? .ok : .pending) {
+                StepCard(index: "2", title: L.t("选择两路喇叭并创建聚合设备"), state: coordinator.aggregateDevice != nil ? .ok : .pending) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Picker("高频设备（笔记本喇叭）", selection: $settings.highDeviceUID) {
+                        Picker(L.t("高频设备（笔记本喇叭）"), selection: $settings.highDeviceUID) {
                             ForEach(coordinator.devices) { d in
                                 Text("\(d.name)（\(d.outputChannels)ch）").tag(d.uid as String?)
                             }
                         }
-                        Picker("低频设备（外接音箱）", selection: $settings.lowDeviceUID) {
+                        Picker(L.t("低频设备（外接音箱）"), selection: $settings.lowDeviceUID) {
                             ForEach(coordinator.devices) { d in
                                 Text("\(d.name)（\(d.outputChannels)ch）").tag(d.uid as String?)
                             }
                         }
-                        Text("聚合设备名固定为 MultiSpeaker：ch1/ch2 接高频设备，ch3/ch4 接低频设备；时钟源=高频设备，低频设备自动开漂移修正。")
+                        Text(L.t("聚合设备名固定为 MultiSpeaker：ch1/ch2 接高频设备，ch3/ch4 接低频设备；时钟源=高频设备，低频设备自动开漂移修正。"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack {
                             Button {
                                 coordinator.createAggregate()
                             } label: {
-                                Label("创建 / 重建聚合设备", systemImage: "plus.square")
+                                Label(L.t("创建 / 重建聚合设备"), systemImage: "plus.square")
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(coordinator.isBusy)
-                            Button("删除", role: .destructive) { coordinator.destroyAggregate() }
+                            Button(L.t("删除"), role: .destructive) { coordinator.destroyAggregate() }
                                 .disabled(coordinator.aggregateDevice == nil)
                             if let agg = coordinator.aggregateDevice {
-                                Text("MultiSpeaker 在线（objectID \(agg.objectID)）")
+                                Text(L.t("MultiSpeaker 在线（objectID %d）", agg.objectID))
                                     .font(.caption)
                                     .foregroundStyle(.green)
                             }
@@ -206,27 +209,27 @@ struct SetupView: View {
                 }
 
                 // 第 3 步：默认输出
-                StepCard(index: "3", title: "系统默认输出 → BlackHole 2ch", state: (coordinator.blackHoleDevice != nil && coordinator.defaultOutputDevice?.isBlackHole == true) ? .ok : .pending) {
+                StepCard(index: "3", title: L.t("系统默认输出 → BlackHole 2ch"), state: (coordinator.blackHoleDevice != nil && coordinator.defaultOutputDevice?.isBlackHole == true) ? .ok : .pending) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Button {
                                 coordinator.setBlackHoleAsDefault()
                             } label: {
-                                Label("设为默认输出", systemImage: "speaker.wave.2")
+                                Label(L.t("设为默认输出"), systemImage: "speaker.wave.2")
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(coordinator.blackHoleDevice == nil)
-                            Button("切回内置喇叭") { coordinator.restoreBuiltinOutput() }
+                            Button(L.t("切回内置喇叭")) { coordinator.restoreBuiltinOutput() }
                         }
-                        Text("当前默认输出：\(coordinator.defaultOutputDevice?.name ?? "未知")")
+                        Text(L.t("当前默认输出：%@", coordinator.defaultOutputDevice?.name ?? L.t("未知")))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
 
                 // 第 4 步：CamillaDSP
-                StepCard(index: "4", title: "CamillaDSP 引擎（已内置 v4.1.3）", state: coordinator.camilla.binaryPath != nil ? .ok : .warn) {
-                    Text(coordinator.camilla.binaryPath ?? "未找到 camilladsp 可执行文件")
+                StepCard(index: "4", title: L.t("CamillaDSP 引擎（已内置 v4.1.3）"), state: coordinator.camilla.binaryPath != nil ? .ok : .warn) {
+                    Text(coordinator.camilla.binaryPath ?? L.t("未找到 camilladsp 可执行文件"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -237,7 +240,7 @@ struct SetupView: View {
                     Button {
                         coordinator.setupEverything()
                     } label: {
-                        Label("一键完成全部设置并开始播放", systemImage: "play.fill")
+                        Label(L.t("一键完成全部设置并开始播放"), systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -295,6 +298,58 @@ private struct SliderRow: View {
     }
 }
 
+/// 总音量：位置→dB 走感知曲线（半格约 -12dB），改动物理上不会重启引擎。
+struct VolumeControl: View {
+    @Environment(AppCoordinator.self) private var coordinator
+
+    var body: some View {
+        @Bindable var settings = coordinator.settings
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L.t("总音量")).font(.subheadline)
+                Spacer()
+                Text(readout)
+                    .monospacedDigit()
+                    .foregroundStyle(settings.masterVolumeDb > 3 ? Color.orange : Color.secondary)
+            }
+            HStack(spacing: 10) {
+                Button {
+                    settings.muted.toggle()
+                    coordinator.muteChanged()
+                } label: {
+                    Image(systemName: settings.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .frame(width: 20)
+                }
+                .buttonStyle(.plain)
+                .help(settings.muted ? L.t("取消静音") : L.t("静音"))
+
+                Slider(value: $settings.volumePosition, in: 0...1)
+                    .onChange(of: settings.volumePosition) { _, _ in coordinator.volumeChanged() }
+            }
+            Text(L.t("音量会立即生效（不需要重启引擎）。最右端留了 +12dB 增益余量。"))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            if settings.masterVolumeDb > 3 {
+                Label(L.t("增益已达 %@dB，大动态曲目可能削顶", String(format: "%+.0f", settings.masterVolumeDb)),
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var readout: String {
+        let settings = coordinator.settings
+        if settings.muted { return L.t("已静音") }
+        if VolumeCurve.isSilent(settings.volumePosition) { return L.t("静音") }
+        let percent = VolumeCurve.percent(forPosition: settings.volumePosition)
+        let db = Int(settings.masterVolumeDb.rounded())
+        return "\(percent)% · \(db > 0 ? "+" : "")\(db) dB"
+    }
+}
+
 struct TuningView: View {
     @Environment(AppCoordinator.self) private var coordinator
 
@@ -308,60 +363,58 @@ struct TuningView: View {
                         HStack(spacing: 6) {
                             pill("stereo in", color: .primary)
                             chainArrow()
-                            pill("L/R 各复制两路", color: .blue)
+                            pill(L.t("L/R 各复制两路"), color: .blue)
                             chainArrow()
                             VStack(alignment: .leading, spacing: 3) {
-                                pill("ch0/1 → HP \(Int(settings.crossoverHz))Hz + 延迟 \(Int(settings.delayMs))ms → 笔记本", color: .orange)
-                                pill("ch2/3 → LP \(Int(settings.crossoverHz))Hz → 外接音箱", color: .indigo)
+                                pill(L.t("ch0/1 → HP %dHz + 延迟 %dms → 笔记本", Int(settings.crossoverHz), Int(settings.delayMs)), color: .orange)
+                                pill(L.t("ch2/3 → LP %dHz → 外接音箱", Int(settings.crossoverHz)), color: .indigo)
                             }
                         }
-                        Text("LR4（24dB/oct）分频，分频点处同相叠加、衔接平直。")
+                        Text(L.t("LR4（24dB/oct）分频，分频点处同相叠加、衔接平直。"))
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
                     .padding(6)
                 } label: {
-                    Text("分频结构").font(.headline)
+                    Text(L.t("分频结构")).font(.headline)
                 }
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
-                        SliderRow(title: "总音量", value: $settings.masterVolumeDb, range: -60...0, step: 1, unit: "dB",
-                                  hint: "输出走 BlackHole 时键盘音量键会失效，用这里控制总音量。")
-                        Toggle("静音", isOn: $settings.muted)
+                        VolumeControl()
                         Divider()
-                        SliderRow(title: "分频点", value: $settings.crossoverHz, range: 80...320, step: 5, unit: "Hz",
-                                  hint: "人声发闷往上提，低频空洞往下降。四个滤波器会同步修改。")
-                        SliderRow(title: "高频链路延迟补偿", value: $settings.delayMs, range: 0...40, step: 2, unit: "ms",
-                                  hint: "内置喇叭链路更快，加延迟对齐显示器链路；鼓点发散/拖沓时以 2ms 步进试听。")
+                        SliderRow(title: L.t("分频点"), value: $settings.crossoverHz, range: 80...320, step: 5, unit: "Hz",
+                                  hint: L.t("人声发闷往上提，低频空洞往下降。四个滤波器会同步修改。"))
+                        SliderRow(title: L.t("高频链路延迟补偿"), value: $settings.delayMs, range: 0...40, step: 2, unit: "ms",
+                                  hint: L.t("内置喇叭链路更快，加延迟对齐显示器链路；鼓点发散/拖沓时以 2ms 步进试听。"))
                         Divider()
-                        SliderRow(title: "笔记本喇叭增益", value: $settings.gainBuiltinDb, range: -24...6, step: 0.5, unit: "dB",
-                                  hint: "先把外接音箱物理音量拧到适中，再用增益微调两路响度。")
-                        SliderRow(title: "外接音箱增益", value: $settings.gainMonitorDb, range: -24...6, step: 0.5, unit: "dB")
+                        SliderRow(title: L.t("笔记本喇叭增益"), value: $settings.gainBuiltinDb, range: -24...6, step: 0.5, unit: "dB",
+                                  hint: L.t("先把外接音箱物理音量拧到适中，再用增益微调两路响度。"))
+                        SliderRow(title: L.t("外接音箱增益"), value: $settings.gainMonitorDb, range: -24...6, step: 0.5, unit: "dB")
                         Divider()
-                        Picker("缓冲区（爆音/断续时调大）", selection: $settings.chunksize) {
-                            Text("512（延迟最低）").tag(512)
-                            Text("1024（更稳）").tag(1024)
-                            Text("2048（最稳）").tag(2048)
+                        Picker(L.t("缓冲区（爆音/断续时调大）"), selection: $settings.chunksize) {
+                            Text(L.t("512（延迟最低）")).tag(512)
+                            Text(L.t("1024（更稳）")).tag(1024)
+                            Text(L.t("2048（最稳）")).tag(2048)
                         }
                     }
                     .padding(6)
                 } label: {
-                    Text("调音参数").font(.headline)
+                    Text(L.t("调音参数")).font(.headline)
                 }
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("调音顺序：① 电平平衡 → ② 分频点 → ③ 延迟对齐 → ④ 相位检查。")
+                        Text(L.t("调音顺序：① 电平平衡 → ② 分频点 → ③ 延迟对齐 → ④ 相位检查。"))
                             .font(.callout)
-                        Text("改动会自动保存；若 CamillaDSP 正在运行，0.6 秒后自动热重启生效。")
+                        Text(L.t("改动会自动保存；若 CamillaDSP 正在运行，0.6 秒后自动热重启生效。"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(6)
                 } label: {
-                    Text("怎么调").font(.headline)
+                    Text(L.t("怎么调")).font(.headline)
                 }
             }
             .padding(16)
@@ -370,8 +423,6 @@ struct TuningView: View {
         .onChange(of: settings.delayMs) { _, _ in coordinator.settingsChanged() }
         .onChange(of: settings.gainBuiltinDb) { _, _ in coordinator.settingsChanged() }
         .onChange(of: settings.gainMonitorDb) { _, _ in coordinator.settingsChanged() }
-        .onChange(of: settings.masterVolumeDb) { _, _ in coordinator.settingsChanged() }
-        .onChange(of: settings.muted) { _, _ in coordinator.settingsChanged() }
         .onChange(of: settings.chunksize) { _, _ in coordinator.settingsChanged() }
     }
 }
@@ -393,7 +444,7 @@ struct ControlView: View {
                         .fill(coordinator.camilla.isRunning ? .green : .gray)
                         .frame(width: 12, height: 12)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(coordinator.camilla.isRunning ? "CamillaDSP 运行中" : "CamillaDSP 已停止")
+                        Text(coordinator.camilla.isRunning ? L.t("CamillaDSP 运行中") : L.t("CamillaDSP 已停止"))
                             .font(.headline)
                         if !coordinator.statusMessage.isEmpty {
                             Text(coordinator.statusMessage)
@@ -403,11 +454,11 @@ struct ControlView: View {
                     }
                     Spacer()
                     if coordinator.camilla.isRunning {
-                        Button("停止", role: .destructive) { coordinator.stopEngine() }
+                        Button(L.t("停止"), role: .destructive) { coordinator.stopEngine() }
                             .buttonStyle(.bordered)
                             .controlSize(.large)
                     } else {
-                        Button("启动") { coordinator.startEngine() }
+                        Button(L.t("启动")) { coordinator.startEngine() }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.large)
                     }
@@ -425,23 +476,23 @@ struct ControlView: View {
             // 自启 / 恢复
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("开机自动启动（并自动开始播放）", isOn: $settings.startOnLaunch)
-                        .onChange(of: settings.startOnLaunch) { _, new in
-                            coordinator.settingsChanged()
+                    Toggle(L.t("开机自动启动（并自动开始播放）"), isOn: $settings.startOnLaunch)
+                        .onChange(of: settings.startOnLaunch) { _, _ in
+                            coordinator.settings.save()
                         }
                     HStack {
-                        Toggle("登录时启动本 App", isOn: Binding(
+                        Toggle(L.t("登录时启动本 App"), isOn: Binding(
                             get: { coordinator.launcher.isEnabled },
                             set: { coordinator.toggleAutostart($0) }
                         ))
                         .disabled(!coordinator.launcher.canEnable)
-                        Button("把系统输出切回内置喇叭") { coordinator.restoreBuiltinOutput() }
+                        Button(L.t("把系统输出切回内置喇叭")) { coordinator.restoreBuiltinOutput() }
                     }
-                    Toggle("点关闭按钮时收进顶部状态栏", isOn: $settings.hideOnClose)
+                    Toggle(L.t("点关闭按钮时收进顶部状态栏"), isOn: $settings.hideOnClose)
                         .onChange(of: settings.hideOnClose) { _, _ in
-                            coordinator.settingsChanged()
+                            coordinator.settings.save()
                         }
-                    Text("开启时关闭窗口不会退出程序：Dock 图标隐藏，点菜单栏的音箱图标可随时调音量、启停或打开主窗口。")
+                    Text(L.t("开启时关闭窗口不会退出程序：Dock 图标隐藏，点菜单栏的音箱图标可随时调音量、启停或打开主窗口。"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -453,7 +504,31 @@ struct ControlView: View {
                 }
                 .padding(6)
             } label: {
-                Text("启动选项").font(.headline)
+                Text(L.t("启动选项")).font(.headline)
+            }
+
+            // 语言
+            GroupBox {
+                HStack(spacing: 10) {
+                    Picker(L.t("语言"), selection: Binding(
+                        get: { AppLanguage(rawValue: settings.language) ?? .system },
+                        set: { newValue in
+                            settings.language = newValue.rawValue
+                            coordinator.languageChanged()
+                        }
+                    )) {
+                        ForEach(AppLanguage.allCases) { lang in
+                            Text(lang.menuTitle).tag(lang)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 340)
+                    Spacer()
+                }
+                .padding(6)
+            } label: {
+                Text(L.t("语言")).font(.headline)
             }
 
             // 日志
@@ -481,12 +556,12 @@ struct ControlView: View {
                 }
             } label: {
                 HStack {
-                    Text("日志").font(.headline)
+                    Text(L.t("日志")).font(.headline)
                     Spacer()
-                    Toggle("自动滚动", isOn: $autoScroll)
+                    Toggle(L.t("自动滚动"), isOn: $autoScroll)
                         .toggleStyle(.checkbox)
                         .font(.caption)
-                    Button("清空") { coordinator.camilla.clearLog() }
+                    Button(L.t("清空")) { coordinator.camilla.clearLog() }
                         .font(.caption)
                 }
             }

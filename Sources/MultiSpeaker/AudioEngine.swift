@@ -94,7 +94,7 @@ enum AudioEngine {
         guard high.outputChannels == 2, low.outputChannels == 2 else {
             throw CoreAudioError.osStatus(
                 -50,
-                "两路设备都必须是立体声（2ch）。当前：\(high.name)=\(high.outputChannels)ch，\(low.name)=\(low.outputChannels)ch"
+                L.t("两路设备都必须是立体声（2ch）。当前：%@=%dch，%@=%dch", high.name, high.outputChannels, low.name, low.outputChannels)
             )
         }
         let subHigh: [String: Any] = [
@@ -122,7 +122,7 @@ enum AudioEngine {
         var newID = kAudioObjectUnknown
         let status = AudioHardwareCreateAggregateDevice(description as CFDictionary, &newID)
         guard status == noErr, newID != kAudioObjectUnknown else {
-            throw CoreAudioError.osStatus(status, "创建聚合设备失败")
+            throw CoreAudioError.osStatus(status, L.t("创建聚合设备失败"))
         }
         // 统一到 48kHz（失败不阻塞，例如外接设备不支持 48k 时会由 HAL 重采样）
         _ = setNominalSampleRate(newID, rate: 48000)
@@ -140,7 +140,7 @@ enum AudioEngine {
         var id = objectID
         let status = AudioObjectSetPropertyData(systemObject, &addr, 0, nil, UInt32(MemoryLayout<AudioObjectID>.size), &id)
         guard status == noErr else {
-            throw CoreAudioError.osStatus(status, "设置系统默认输出失败")
+            throw CoreAudioError.osStatus(status, L.t("设置系统默认输出失败"))
         }
     }
 

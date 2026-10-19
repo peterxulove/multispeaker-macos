@@ -14,7 +14,7 @@ struct MultiSpeakerApp: App {
     }
 
     var body: some Scene {
-        Window("MultiSpeaker · 多喇叭合奏", id: "main") {
+        Window(L.t("MultiSpeaker · 多喇叭合奏"), id: "main") {
             ContentView()
                 .environment(coordinator)
         }

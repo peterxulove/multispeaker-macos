@@ -17,6 +17,13 @@ final class SettingsModel: @unchecked Sendable {
 
     var startOnLaunch: Bool = true   // 打开 App 自动跑 CamillaDSP
     var hideOnClose: Bool = true     // 点关闭按钮时收进顶部状态栏（而不是关掉窗口）
+    var language: String = AppLanguage.system.rawValue   // system / zh / en
+
+    /// 滑块位置（0…1）↔ dB 的感知映射，UI 只碰这个，不直接碰 dB
+    var volumePosition: Double {
+        get { VolumeCurve.position(forDb: masterVolumeDb) }
+        set { masterVolumeDb = VolumeCurve.db(forPosition: newValue) }
+    }
 
     @ObservationIgnored
     private let defaults = UserDefaults.standard
@@ -34,6 +41,7 @@ final class SettingsModel: @unchecked Sendable {
         chunksize = d.object(forKey: "settings.chunksize") as? Int ?? 1024
         startOnLaunch = (d.object(forKey: "settings.startOnLaunch") as? Bool) ?? true
         hideOnClose = (d.object(forKey: "settings.hideOnClose") as? Bool) ?? true
+        language = d.string(forKey: "settings.language") ?? AppLanguage.system.rawValue
     }
 
     func save() {
@@ -49,5 +57,6 @@ final class SettingsModel: @unchecked Sendable {
         d.set(chunksize, forKey: "settings.chunksize")
         d.set(startOnLaunch, forKey: "settings.startOnLaunch")
         d.set(hideOnClose, forKey: "settings.hideOnClose")
+        d.set(language, forKey: "settings.language")
     }
 }

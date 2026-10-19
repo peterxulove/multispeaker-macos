@@ -98,7 +98,7 @@ struct MenuBarPanel: View {
                 Circle()
                     .fill(coordinator.camilla.isRunning ? Color.green : Color.secondary)
                     .frame(width: 8, height: 8)
-                Text(coordinator.camilla.isRunning ? "正在播放" : "已停止")
+                Text(L.t(coordinator.camilla.isRunning ? "正在播放" : "已停止"))
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(routeSummary)
@@ -108,28 +108,27 @@ struct MenuBarPanel: View {
                     .truncationMode(.middle)
             }
 
-            // 总音量（BlackHole 链路上键盘音量键无效，这里是唯一入口）
+            // 总音量（走 websocket 实时生效，不重启引擎）
             HStack(spacing: 8) {
                 Button {
                     settings.muted.toggle()
-                    coordinator.settingsChanged()
+                    coordinator.muteChanged()
                 } label: {
                     Image(systemName: settings.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                         .frame(width: 18)
                 }
                 .buttonStyle(.plain)
-                .help(settings.muted ? "取消静音" : "静音")
+                .help(settings.muted ? L.t("取消静音") : L.t("静音"))
 
-                Slider(value: $settings.masterVolumeDb, in: -60...0, step: 1)
+                Slider(value: $settings.volumePosition, in: 0...1)
                     .controlSize(.mini)
-                    .disabled(settings.muted)
-                    .onChange(of: settings.masterVolumeDb) { _, _ in coordinator.settingsChanged() }
+                    .onChange(of: settings.volumePosition) { _, _ in coordinator.volumeChanged() }
 
-                Text(settings.muted ? "静音" : "\(Int(settings.masterVolumeDb)) dB")
+                Text(volumeLabel)
                     .font(.system(size: 10))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 42, alignment: .trailing)
+                    .foregroundStyle(settings.masterVolumeDb > 3 ? Color.orange : Color.secondary)
+                    .frame(width: 52, alignment: .trailing)
             }
 
             Divider()
@@ -143,7 +142,7 @@ struct MenuBarPanel: View {
                         coordinator.startEngine()
                     }
                 } label: {
-                    Label(coordinator.camilla.isRunning ? "停止" : "启动",
+                    Label(coordinator.camilla.isRunning ? L.t("停止") : L.t("启动"),
                           systemImage: coordinator.camilla.isRunning ? "stop.fill" : "play.fill")
                 }
                 .controlSize(.small)
@@ -151,7 +150,7 @@ struct MenuBarPanel: View {
                 Button {
                     openMainWindow()
                 } label: {
-                    Label("打开主窗口", systemImage: "macwindow")
+                    Label(L.t("打开主窗口"), systemImage: "macwindow")
                 }
                 .controlSize(.small)
 
@@ -163,7 +162,7 @@ struct MenuBarPanel: View {
                     Image(systemName: "power")
                 }
                 .controlSize(.small)
-                .help("退出 MultiSpeaker")
+                .help(L.t("退出 MultiSpeaker"))
             }
 
             if !coordinator.statusMessage.isEmpty {
@@ -176,6 +175,15 @@ struct MenuBarPanel: View {
         }
         .padding(12)
         .frame(width: 330)
+    }
+
+    private var volumeLabel: String {
+        let settings = coordinator.settings
+        if settings.muted { return L.t("已静音") }
+        if VolumeCurve.isSilent(settings.volumePosition) { return L.t("静音") }
+        let percent = VolumeCurve.percent(forPosition: settings.volumePosition)
+        let db = Int(settings.masterVolumeDb.rounded())
+        return "\(percent)% · \(db > 0 ? "+" : "")\(db)dB"
     }
 
     private var routeSummary: String {

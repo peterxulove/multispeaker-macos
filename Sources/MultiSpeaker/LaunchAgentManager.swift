@@ -27,7 +27,7 @@ final class LaunchAgentManager {
         if appBinaryPath == nil {
             canEnable = false
             isEnabled = false
-            message = "当前不是以 .app 运行（可能是 swift run），无法设置开机自启。"
+            message = L.t("当前不是以 .app 运行（可能是 swift run），无法设置开机自启。")
         } else {
             canEnable = true
             isEnabled = FileManager.default.fileExists(atPath: Self.plistURL.path)
@@ -60,17 +60,17 @@ final class LaunchAgentManager {
             do {
                 try plist.write(to: Self.plistURL, atomically: true, encoding: .utf8)
             } catch {
-                message = "写入 LaunchAgent 失败：\(error.localizedDescription)"
+                message = L.t("写入 LaunchAgent 失败：%@", error.localizedDescription)
                 return
             }
             _ = Shell.runSync("/bin/launchctl", ["bootstrap", "gui/\(getuid())", Self.plistURL.path])
             isEnabled = true
-            message = "已开启开机自启（日志 /tmp/multispeaker.log）"
+            message = L.t("已开启开机自启（日志 /tmp/multispeaker.log）")
         } else {
             _ = Shell.runSync("/bin/launchctl", ["bootout", "gui/\(getuid())/\(Self.label)"])
             try? FileManager.default.removeItem(at: Self.plistURL)
             isEnabled = false
-            message = "已关闭开机自启"
+            message = L.t("已关闭开机自启")
         }
     }
 }
