@@ -1,0 +1,15 @@
+# Swift / SwiftPM 构建产物
+.build/
+*.o
+*.swiftmodule
+
+# 组装出来的 .app（发布用 dist/MultiSpeaker.zip 里的那份）
+MultiSpeaker.app/
+
+# 打包中间产物
+*.tar.gz
+*.dmg
+
+# macOS
+.DS_Store
+._*
